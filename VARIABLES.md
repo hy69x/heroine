@@ -5,8 +5,8 @@ This document serves as the single source of truth for all configurable variable
 ## Input & Composition
 | Flag | Variable | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `--polymer` | `polymer` | **Required** | The SMILES string of the polymer chain. |
-| `--drug` | `drug` | **Required** | The SMILES string of the drug/payload molecule. |
+| `--polymer` | `polymer` | **Required** | The SMILES string or common name of the polymer chain. Names are fetched from PubChem automatically. |
+| `--drug` | `drug` | **Required** | The SMILES string or common name of the drug/payload molecule. Names are fetched from PubChem automatically. |
 | `--name` | `name` | `encapsulation_run` | Name of the job (creates `output/<name>` directory). |
 | `--polymer_count` | `polymer_count` | `1` | Number of polymer chains to simulate. |
 | `--drug_count` | `drug_count` | `5` | Number of drug molecules to inject. |

@@ -210,13 +210,25 @@ def calculate_encapsulation_efficiency(dump_path: Path, polymer_count: int, payl
             polymer_com = np.mean(p_atoms_np, axis=0)
             
             encapsulated_count = 0
-            threshold = 1.5 * rg
+            # A drug is considered encapsulated if its COM is within 5.0A of ANY polymer atom
+            # OR within 1.2 * Rg of the polymer COM (backward compatibility/heuristic)
+            threshold_rg = 1.2 * rg
             
             for mol_id, atoms in payload_mols.items():
                 if not atoms: continue
                 payload_com = np.mean(np.array(atoms), axis=0)
-                dist = np.linalg.norm(payload_com - polymer_com)
-                if dist <= threshold:
+                
+                # Check 1: Near any polymer atom (Robust)
+                # We use a subset of polymer atoms if there are too many, for speed
+                step = max(1, len(p_atoms_np) // 500)
+                dists_to_atoms = np.linalg.norm(p_atoms_np[::step] - payload_com, axis=1)
+                if np.any(dists_to_atoms < 5.0):
+                    encapsulated_count += 1
+                    continue
+                
+                # Check 2: Near polymer COM (Heuristic)
+                dist_to_com = np.linalg.norm(payload_com - polymer_com)
+                if dist_to_com <= threshold_rg:
                     encapsulated_count += 1
                     
             return (encapsulated_count / payload_count) * 100.0 if payload_count > 0 else 0.0

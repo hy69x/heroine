@@ -1,6 +1,6 @@
 """
-Heroine: Drug Encapsulation Simulator
-Extract from Proteus Project
+HEROINE: Drug Encapsulation Simulator
+Part of the Proteus Project Suite
 """
 
 import argparse
@@ -13,31 +13,53 @@ from datetime import datetime
 # Add src to python path
 sys.path.append(str(Path(__file__).parent / "src"))
 
-from src import topology, simulation, analysis, visualization, report
+from src import topology, simulation, analysis, visualization, report, utils
 
-def validate_smiles(smiles: str, label: str = "Molecule"):
-    """Validates a SMILES string using RDKit."""
-    if not smiles: return None
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
-        print(f"Error: Invalid {label} SMILES: {smiles}")
-        return None
-    return smiles
+def resolve_molecule(identifier: str, label: str = "Molecule"):
+    """
+    Validates identifier as SMILES, or attempts to fetch it from PubChem if it's a name.
+    """
+    if not identifier: return None
+    
+    # Try RDKit validation first
+    mol = Chem.MolFromSmiles(identifier)
+    if mol is not None:
+        return identifier
+    
+    # If invalid SMILES, try fetching as a name
+    print(f"[*] '{identifier}' is not a valid SMILES. Attempting to fetch from PubChem...")
+    fetched = utils.fetch_smiles_by_name(identifier)
+    if fetched:
+        return fetched
+        
+    print(f"Error: Could not resolve {label}: {identifier}")
+    return None
 
 def run_encapsulation_pipeline(args):
     """
     Orchestrates the drug encapsulation pipeline.
     """
-    # Validation
-    if not validate_smiles(args.polymer, "Polymer"):
-        raise ValueError(f"Invalid Polymer SMILES: {args.polymer}")
-    if not validate_smiles(args.drug, "Drug"):
-        raise ValueError(f"Invalid Drug SMILES: {args.drug}")
+    # Validation and Resolution
+    polymer_smiles = resolve_molecule(args.polymer, "Polymer")
+    if not polymer_smiles:
+        raise ValueError(f"Invalid Polymer identifier: {args.polymer}")
+        
+    drug_smiles = resolve_molecule(args.drug, "Drug")
+    if not drug_smiles:
+        raise ValueError(f"Invalid Drug identifier: {args.drug}")
     
     # Construct system SMILES
-    polymer_list = [args.polymer] * args.polymer_count
-    drug_list = [args.drug] * args.drug_count
-    system_smiles = ".".join(polymer_list + drug_list)
+    # If UI passed total_poly_count, it means it already pre-expanded the strings.
+    if hasattr(args, "total_poly_count"):
+        system_smiles = f"{polymer_smiles}.{drug_smiles}"
+        p_count_for_analysis = args.total_poly_count
+        d_count_for_analysis = args.total_drug_count
+    else:
+        polymer_list = [polymer_smiles] * args.polymer_count
+        drug_list = [drug_smiles] * args.drug_count
+        system_smiles = ".".join(polymer_list + drug_list)
+        p_count_for_analysis = args.polymer_count
+        d_count_for_analysis = args.drug_count
     
     # Setup Paths
     output_dir = Path(os.getcwd()) / "output" / args.name
@@ -57,27 +79,43 @@ def run_encapsulation_pipeline(args):
     print(f"System: {args.polymer_count}x Polymer, {args.drug_count}x Drug")
     print("=" * 50)
     
+    # Checkpointing: Check if simulation is already done
+    skip_simulation = False
+    if paths["log"].exists():
+        with open(paths["log"], "r") as f:
+            content = f.read()
+            if "Total wall time:" in content or "Loop time" in content:
+                print(f"[*] Simulation log found and appears complete. Skipping MD Phase.")
+                skip_simulation = True
+
     # 1. Topology
-    print("[*] Phase 1: Topology Generation (Combining Polymer & Drug)")
-    bond_p, angle_p, dihedral_p = topology.generate_topology(system_smiles, paths["data"], padding=args.padding)
+    if not skip_simulation or not paths["data"].exists():
+        print("[*] Phase 1: Topology Generation (Combining Polymer & Drug)")
+        bond_p, angle_p, dihedral_p = topology.generate_topology(system_smiles, paths["data"], padding=args.padding)
+    else:
+        print("[*] Phase 1: Skipping Topology Generation (Using existing data file)")
+        # We need these params if we were to rerun simulation, but if we skip simulation we don't strictly need them
+        # unless they are needed for analysis (they aren't currently).
+        bond_p, angle_p, dihedral_p = {}, {}, {}
     
     # 2. Simulation
-    print("[*] Phase 2: Molecular Dynamics Simulation (LAMMPS)")
-    simulation.generate_input_file(
-        paths["data"], paths["input"], paths["dump"], 
-        steps=args.steps, temp=args.temp, damp=args.damp,
-        timestep=args.timestep,
-        bond_params=bond_p, angle_params=angle_p, dihedral_params=dihedral_p
-    )
-    simulation.run_simulation(paths["input"], paths["log"])
+    if not skip_simulation:
+        print("[*] Phase 2: Molecular Dynamics Simulation (LAMMPS)")
+        simulation.generate_input_file(
+            paths["data"], paths["input"], paths["dump"], 
+            steps=args.steps, temp=args.temp, damp=args.damp,
+            timestep=args.timestep,
+            bond_params=bond_p, angle_params=angle_p, dihedral_params=dihedral_p
+        )
+        simulation.run_simulation(paths["input"], paths["log"])
     
     # 3. Analysis
     print("[*] Phase 3: Analytics (Calculating Encapsulation Efficiency)")
     results = analysis.analyze_results(
         paths["log"], 
         output_plot=paths["plot"],
-        polymer_count=args.polymer_count,
-        payload_count=args.drug_count,
+        polymer_count=p_count_for_analysis,
+        payload_count=d_count_for_analysis,
         dump_path=paths["dump"]
     )
 
@@ -92,7 +130,7 @@ def run_encapsulation_pipeline(args):
         report.generate_report(
             output_dir,
             args.name,
-            args.polymer,
+            polymer_smiles,
             args.steps,
             args.temp,
             results["rg"],

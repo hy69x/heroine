@@ -2,7 +2,26 @@
 
 **HEROINE** (Extract from the Proteus Project) is an automated pipeline for simulating the encapsulation of drug molecules within polymer nanoparticles. It converts chemical SMILES into physical topologies, executes LAMMPS molecular dynamics, and calculates encapsulation efficiency.
 
-## 🚀 Quick Start (Using uv)
+## 🌟 Features
+
+- **Automated SMILES Fetching**: Provide a drug or polymer name (e.g., "aspirin"), and HEROINE will fetch the SMILES from PubChem.
+- **Physical Topology**: Uses RDKit to generate 3D coordinates and LAMMPS topology with heuristic OPLS-AA parameters.
+- **Molecular Dynamics**: High-performance simulation using LAMMPS (supports GPU acceleration if available).
+- **Robust Analytics**: Calculates Radius of Gyration and encapsulation efficiency using a proximity-based algorithm.
+- **Smart Pipeline**: Built-in checkpointing skips completed phases, and improved error diagnostics parse LAMMPS logs for failures.
+
+## 🚀 Quick Start (Web UI)
+
+HEROINE now includes a modern, easy-to-use Gradio Web UI for configuring simulations directly from your browser without using the command line.
+
+To launch the Web UI:
+
+```bash
+uv run ui.py
+```
+Then open your browser to `http://127.0.0.1:7860`. The UI allows you to search for molecules by name, adjust simulation counts, and view the generated PDF report, plots, and GIFs directly!
+
+## 🚀 Quick Start (CLI)
 
 To run a drug encapsulation simulation:
 

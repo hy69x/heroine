@@ -69,7 +69,7 @@ def generate_report(
     elements = []
     
     # Title & Metadata
-    elements.append(Paragraph(f"Proteus Simulation Report: {name}", title_style))
+    elements.append(Paragraph(f"HEROINE Simulation Report: {name}", title_style))
     elements.append(Paragraph(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
     elements.append(Spacer(1, 20))
     
